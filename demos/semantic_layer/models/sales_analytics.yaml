@@ -1,0 +1,388 @@
+# Sales Analytics Semantic Model
+# A complete example of metrics, dimensions, and hierarchies for e-commerce analytics
+
+semantic_model:
+  id: sales_analytics_v1
+  name: Sales Analytics
+  description: Core sales metrics and dimensions for e-commerce analytics
+  owner: data_team
+  version: "1.0"
+
+# ==================== METRICS ====================
+metrics:
+  # Core Revenue Metrics
+  - id: total_revenue
+    name: Total Revenue
+    description: Sum of all order amounts including tax and shipping
+    type: simple
+    expression: SUM(order_amount)
+    entity_id: ent_orders
+    attribute_id: order_amount
+    aggregation: sum
+    unit: "$"
+    format: "#,##0.00"
+    owner: finance_team
+    certified: true
+    tags: [revenue, core-kpi, audited]
+    time_grains: [day, week, month, quarter, year]
+
+  - id: gross_revenue
+    name: Gross Revenue
+    description: Revenue before discounts and refunds
+    type: simple
+    expression: SUM(gross_amount)
+    entity_id: ent_orders
+    attribute_id: gross_amount
+    aggregation: sum
+    unit: "$"
+    format: "#,##0.00"
+    certified: true
+    tags: [revenue, gross]
+
+  - id: net_revenue
+    name: Net Revenue
+    description: Revenue after discounts, returns, and refunds
+    type: derived
+    expression: gross_revenue - total_discounts - total_refunds
+    entity_id: ent_orders
+    unit: "$"
+    format: "#,##0.00"
+    certified: true
+    tags: [revenue, net, core-kpi]
+
+  # Order Metrics
+  - id: order_count
+    name: Order Count
+    description: Total number of orders placed
+    type: simple
+    expression: COUNT(DISTINCT order_id)
+    entity_id: ent_orders
+    attribute_id: order_id
+    aggregation: count_distinct
+    unit: orders
+    format: "#,##0"
+    certified: true
+    tags: [orders, core-kpi]
+
+  - id: avg_order_value
+    name: Average Order Value
+    description: Average revenue per order
+    type: derived
+    expression: total_revenue / order_count
+    entity_id: ent_orders
+    unit: "$"
+    format: "#,##0.00"
+    certified: true
+    tags: [revenue, per-order, core-kpi]
+
+  - id: orders_per_customer
+    name: Orders per Customer
+    description: Average number of orders per unique customer
+    type: ratio
+    expression: order_count / customer_count
+    entity_id: ent_orders
+    unit: orders
+    format: "#,##0.0"
+    tags: [orders, customers]
+
+  # Customer Metrics
+  - id: customer_count
+    name: Customer Count
+    description: Number of unique customers who placed orders
+    type: simple
+    expression: COUNT(DISTINCT customer_id)
+    entity_id: ent_orders
+    attribute_id: customer_id
+    aggregation: count_distinct
+    unit: customers
+    format: "#,##0"
+    certified: true
+    tags: [customers, core-kpi]
+
+  - id: new_customers
+    name: New Customers
+    description: Customers placing their first order
+    type: simple
+    expression: COUNT(DISTINCT customer_id)
+    entity_id: ent_orders
+    attribute_id: customer_id
+    aggregation: count_distinct
+    filters:
+      - id: first_order
+        expression: is_first_order = true
+        description: Only first-time orders
+    unit: customers
+    format: "#,##0"
+    tags: [customers, acquisition]
+
+  - id: repeat_customers
+    name: Repeat Customers
+    description: Customers placing a repeat order
+    type: simple
+    expression: COUNT(DISTINCT customer_id)
+    entity_id: ent_orders
+    attribute_id: customer_id
+    aggregation: count_distinct
+    filters:
+      - id: repeat_order
+        expression: is_first_order = false
+        description: Only repeat orders
+    unit: customers
+    format: "#,##0"
+    tags: [customers, retention]
+
+  - id: customer_lifetime_value
+    name: Customer Lifetime Value
+    description: Average total revenue per customer
+    type: ratio
+    expression: total_revenue / customer_count
+    entity_id: ent_orders
+    unit: "$"
+    format: "#,##0.00"
+    certified: true
+    tags: [customers, ltv, core-kpi]
+
+  # Product Metrics
+  - id: items_sold
+    name: Items Sold
+    description: Total quantity of items sold
+    type: simple
+    expression: SUM(quantity)
+    entity_id: ent_order_items
+    attribute_id: quantity
+    aggregation: sum
+    unit: units
+    format: "#,##0"
+    tags: [products, quantity]
+
+  - id: unique_products_sold
+    name: Unique Products Sold
+    description: Number of distinct products sold
+    type: simple
+    expression: COUNT(DISTINCT product_id)
+    entity_id: ent_order_items
+    attribute_id: product_id
+    aggregation: count_distinct
+    unit: products
+    format: "#,##0"
+    tags: [products]
+
+  - id: avg_items_per_order
+    name: Average Items per Order
+    description: Average number of line items per order
+    type: ratio
+    expression: items_sold / order_count
+    entity_id: ent_order_items
+    unit: items
+    format: "#,##0.0"
+    tags: [products, per-order]
+
+  # Conversion Metrics
+  - id: conversion_rate
+    name: Conversion Rate
+    description: Percentage of visits resulting in purchase
+    type: conversion
+    expression: (order_count / visit_count) * 100
+    entity_id: ent_sessions
+    unit: "%"
+    format: "#,##0.0%"
+    certified: true
+    tags: [conversion, core-kpi]
+
+  - id: cart_abandonment_rate
+    name: Cart Abandonment Rate
+    description: Percentage of carts abandoned without purchase
+    type: conversion
+    expression: ((carts_created - orders_from_cart) / carts_created) * 100
+    entity_id: ent_sessions
+    unit: "%"
+    format: "#,##0.0%"
+    tags: [conversion, cart]
+
+# ==================== DIMENSIONS ====================
+dimensions:
+  # Time Dimensions
+  - id: dim_order_date
+    name: Order Date
+    description: Date when the order was placed
+    entity_id: ent_orders
+    attribute_id: order_date
+    type: time
+    time_granularity: day
+    label: Date
+
+  - id: dim_ship_date
+    name: Ship Date
+    description: Date when the order was shipped
+    entity_id: ent_orders
+    attribute_id: ship_date
+    type: time
+    time_granularity: day
+    label: Ship Date
+
+  # Geographic Dimensions
+  - id: dim_country
+    name: Country
+    description: Customer country
+    entity_id: ent_customers
+    attribute_id: country
+    type: geographic
+    geo_type: country
+    label: Country
+
+  - id: dim_region
+    name: Region
+    description: Sales region
+    entity_id: ent_orders
+    attribute_id: region
+    type: geographic
+    geo_type: region
+    label: Region
+    allowed_values: [North, South, East, West, Central]
+
+  - id: dim_city
+    name: City
+    description: Customer city
+    entity_id: ent_customers
+    attribute_id: city
+    type: geographic
+    geo_type: city
+    label: City
+
+  # Product Dimensions
+  - id: dim_category
+    name: Product Category
+    description: Product category classification
+    entity_id: ent_products
+    attribute_id: category
+    type: categorical
+    label: Category
+
+  - id: dim_subcategory
+    name: Product Subcategory
+    description: Product subcategory
+    entity_id: ent_products
+    attribute_id: subcategory
+    type: categorical
+    label: Subcategory
+
+  - id: dim_brand
+    name: Brand
+    description: Product brand
+    entity_id: ent_products
+    attribute_id: brand
+    type: categorical
+    label: Brand
+
+  # Customer Dimensions
+  - id: dim_customer_segment
+    name: Customer Segment
+    description: Customer segmentation tier
+    entity_id: ent_customers
+    attribute_id: segment
+    type: categorical
+    label: Segment
+    allowed_values: [Enterprise, SMB, Consumer]
+
+  - id: dim_acquisition_channel
+    name: Acquisition Channel
+    description: How the customer was acquired
+    entity_id: ent_customers
+    attribute_id: acquisition_channel
+    type: categorical
+    label: Channel
+    allowed_values: [Organic, Paid Search, Social, Referral, Direct, Email]
+
+  # Order Dimensions
+  - id: dim_order_status
+    name: Order Status
+    description: Current order status
+    entity_id: ent_orders
+    attribute_id: status
+    type: categorical
+    label: Status
+    allowed_values: [Pending, Processing, Shipped, Delivered, Cancelled, Refunded]
+
+  - id: dim_payment_method
+    name: Payment Method
+    description: Payment method used
+    entity_id: ent_orders
+    attribute_id: payment_method
+    type: categorical
+    label: Payment
+    allowed_values: [Credit Card, Debit Card, PayPal, Apple Pay, Bank Transfer]
+
+# ==================== HIERARCHIES ====================
+hierarchies:
+  - id: hier_time
+    name: Time Hierarchy
+    description: Calendar time drill-down
+    type: time
+    levels:
+      - id: lvl_year
+        name: Year
+        dimension_id: dim_order_date
+        order: 0
+      - id: lvl_quarter
+        name: Quarter
+        dimension_id: dim_order_date
+        order: 1
+      - id: lvl_month
+        name: Month
+        dimension_id: dim_order_date
+        order: 2
+      - id: lvl_week
+        name: Week
+        dimension_id: dim_order_date
+        order: 3
+      - id: lvl_day
+        name: Day
+        dimension_id: dim_order_date
+        order: 4
+
+  - id: hier_geography
+    name: Geography Hierarchy
+    description: Geographic drill-down
+    type: geographic
+    levels:
+      - id: lvl_country
+        name: Country
+        dimension_id: dim_country
+        order: 0
+      - id: lvl_region
+        name: Region
+        dimension_id: dim_region
+        order: 1
+      - id: lvl_city
+        name: City
+        dimension_id: dim_city
+        order: 2
+
+  - id: hier_product
+    name: Product Hierarchy
+    description: Product classification drill-down
+    type: product
+    levels:
+      - id: lvl_category
+        name: Category
+        dimension_id: dim_category
+        order: 0
+      - id: lvl_subcategory
+        name: Subcategory
+        dimension_id: dim_subcategory
+        order: 1
+      - id: lvl_brand
+        name: Brand
+        dimension_id: dim_brand
+        order: 2
+
+# ==================== GOVERNANCE ====================
+governance:
+  certification_required_for: [core-kpi]
+  owners:
+    - team: finance_team
+      metrics: [total_revenue, net_revenue, gross_revenue]
+    - team: marketing_team
+      metrics: [customer_count, new_customers, conversion_rate]
+    - team: operations_team
+      metrics: [order_count, items_sold]
