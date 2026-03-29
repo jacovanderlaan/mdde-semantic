@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mdde-semantic"
+version = "0.1.0"
+description = "MDDE Semantic Module - Semantic contracts, metrics, and decision traces"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mdde-core",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
